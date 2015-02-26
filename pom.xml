@@ -54,7 +54,7 @@
       </dependency>
       <dependency>
         <groupId>ugr.cristian</groupId>
-        <artifactId>dijkstra_implementation</artifactId>
+        <artifactId>routeFinder</artifactId>
         <version>0.1</version>
       </dependency>
     </dependencies>

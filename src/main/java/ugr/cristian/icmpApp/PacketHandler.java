@@ -24,7 +24,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
+
 
 import org.opendaylight.controller.sal.action.Action;
 import org.opendaylight.controller.sal.action.Output;
@@ -42,6 +44,7 @@ import org.opendaylight.controller.sal.flowprogrammer.Flow;
 import org.opendaylight.controller.sal.flowprogrammer.IFlowProgrammerService;
 import org.opendaylight.controller.sal.match.Match;
 import org.opendaylight.controller.sal.match.MatchType;
+import org.opendaylight.controller.sal.packet.BitBufferHelper;
 import org.opendaylight.controller.sal.packet.Ethernet;
 import org.opendaylight.controller.sal.packet.IDataPacketService;
 import org.opendaylight.controller.sal.packet.IListenDataPacket;
@@ -59,7 +62,7 @@ import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 
-import ugr.cristian.dijkstra_implementation.DijkstraImplementation;
+import ugr.cristian.routeFinder.routeImp;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,9 +72,12 @@ public class PacketHandler implements IListenDataPacket {
     private static final Logger log = LoggerFactory.getLogger(PacketHandler.class);
 
     private IDataPacketService dataPacketService;
-    DijkstraImplementation implementationDijkstra = new DijkstraImplementation();
+    routeImp implementationRoute = new routeImp();
     private ISwitchManager switchManager;
     private IFlowProgrammerService flowProgrammerService;
+    private Map<InetAddress, NodeConnector> listIP = new HashMap<InetAddress, NodeConnector>();
+
+
 
     short idle = 30;
     short hard = 60;
@@ -160,7 +166,7 @@ public class PacketHandler implements IListenDataPacket {
         Node node = ingressConnector.getNode();
 
         ///////////////////////
-        implementationDijkstra.init();
+        implementationRoute.init();
 
         //log.trace("Packet from " + node.getNodeIDString() + " " + ingressConnector.getNodeConnectorIDString());
 
@@ -168,7 +174,10 @@ public class PacketHandler implements IListenDataPacket {
         Packet pkt = dataPacketService.decodeDataPacket(inPkt);
 
         if (pkt instanceof Ethernet) {
+
             Ethernet ethFrame = (Ethernet) pkt;
+            byte[] srcMAC_B = (ethFrame).getSourceMACAddress();
+            long srcMAC = BitBufferHelper.toNumber(srcMAC_B);
             Object l3Pkt = ethFrame.getPayload();
 
             if (l3Pkt instanceof IPv4) {
@@ -177,25 +186,40 @@ public class PacketHandler implements IListenDataPacket {
                 InetAddress dstAddr = intToInetAddress(ipv4Pkt.getDestinationAddress());
                 Object l4Datagram = ipv4Pkt.getPayload();
 
+                learnSourceIP(orgAddr, ingressConnector);
+
                 if (l4Datagram instanceof ICMP) {
                   ICMP icmpDatagram = (ICMP) l4Datagram;
 
+                  NodeConnector egressConnector = getOutConnector(dstAddr);
+                  if(egressConnector==null){
 
-                    if(  programFlow( dstAddr, orgAddr, ingressConnector, node) ){
-                      log.trace("Flujo instalado correctamente");
+                    floodPacket(inPkt);
+
+                  } else{
+
+                    /**************************Pruebas Dijkstra*********************/
+
+                    Path result = implementationRoute.getRoute(ingressConnector.getNode(), egressConnector.getNode());
+                    if(result==null)
+                    log.trace("Obtenido el path gracias a Dijkstra: " + result);
+                    else
+                    log.trace("Lo que devuelve es nulo");
+
+                    /**************************************************************/
+                    
+                    if(  programFlow( orgAddr, dstAddr, egressConnector, node) ){
+                      log.trace("Flujo instalado correctamente en el nodo " + node + " por el puerto " + egressConnector);
                     }
                     else{
                       log.trace("Error instalando el flujo");
                     }
 
-                  /**************************Pruebas Dijkstra*********************/
+                    inPkt.setOutgoingNodeConnector(egressConnector);
+                    this.dataPacketService.transmitDataPacket(inPkt);
 
-                  //Path result = implementationDijkstra.getRoute(ingressConnector.getNode(), egressConnector.getNode());
-                  //log.trace("Obtenido el path gracias a Dijkstra: " + result);
+                  }
 
-                  /**************************************************************/
-
-                  floodPacket(inPkt);
                   return PacketResult.CONSUME;
 
                 }
@@ -254,6 +278,17 @@ public class PacketHandler implements IListenDataPacket {
         return true;
       }
 
+    }
+
+    private void learnSourceIP(InetAddress srcIP, NodeConnector ingressConnector) {
+
+      this.listIP.put(srcIP, ingressConnector);
+
+    }
+
+    private NodeConnector getOutConnector(InetAddress orgAddress) {
+
+        return this.listIP.get(orgAddress);
     }
 
 }
