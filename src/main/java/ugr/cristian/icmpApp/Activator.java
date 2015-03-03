@@ -30,6 +30,8 @@ import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 
+import ugr.cristian.routeFinder.routeImp;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +75,11 @@ public class Activator extends ComponentActivatorAbstractBase {
                     "setFlowProgrammerService", "unsetFlowProgrammerService")
                     .setRequired(true));
 
+            //Need a StatisticsManagerService to try to resolve new challenges.
+            c.add(createContainerServiceDependency(containerName).setService(
+                    IStatisticsManager.class).setCallbacks(
+                    "setStatisticsManagerService", "unsetStatisticsManagerService")
+                    .setRequired(true));
 
         }
 

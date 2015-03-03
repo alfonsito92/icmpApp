@@ -23,6 +23,8 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -75,12 +77,15 @@ public class PacketHandler implements IListenDataPacket {
     routeImp implementationRoute = new routeImp();
     private ISwitchManager switchManager;
     private IFlowProgrammerService flowProgrammerService;
-    private Map<InetAddress, NodeConnector> listIP = new HashMap<InetAddress, NodeConnector>();
+    private IStatisticsManager statisticsManager;
+    private Map <InetAddress, NodeConnector> listIP = new HashMap <InetAddress, NodeConnector>();
+    private ConcurrentMap< Map<InetAddress, Long>, NodeConnector> listIPMAC = new ConcurrentHashMap<Map<InetAddress, Long>, NodeConnector>();
+    private Map<Node, List<NodeConnectorStatistics>> nodeStatistics = new HashMap<Node, List<NodeConnectorStatistics>>();
 
 
 
-    short idle = 30;
-    short hard = 60;
+    private short idleTimeOut = 30;
+    private short hardTimeOut = 60;
 
     static private InetAddress intToInetAddress(int i) {
         byte b[] = new byte[] { (byte) ((i>>24)&0xff), (byte) ((i>>16)&0xff), (byte) ((i>>8)&0xff), (byte) (i&0xff) };
@@ -157,6 +162,26 @@ public class PacketHandler implements IListenDataPacket {
         }
     }
 
+    /**
+     * Sets a reference to the requested StatisticsService
+     */
+    void setStatisticsManagerService(IStatisticsManager s) {
+        log.trace("Set StatisticsManagerService.");
+
+        statisticsManager = s;
+    }
+
+    /**
+     * Unsets FlowProgrammerService
+     */
+    void unsetFStatisticsManagerService(IStatisticsManager s) {
+        log.trace("Unset StatisticsManagerService.");
+
+        if (  statisticsManager == s) {
+            statisticsManager = null;
+        }
+    }
+
 
     @Override
     public PacketResult receiveDataPacket(RawPacket inPkt) {
@@ -165,10 +190,8 @@ public class PacketHandler implements IListenDataPacket {
         // The node that received the packet ("switch")
         Node node = ingressConnector.getNode();
 
-        ///////////////////////
-        implementationRoute.init();
-
-        //log.trace("Packet from " + node.getNodeIDString() + " " + ingressConnector.getNodeConnectorIDString());
+        //List of nodeconnector statistics;
+        List<NodeConnectorStatistics> stats;
 
         // Use DataPacketService to decode the packet.
         Packet pkt = dataPacketService.decodeDataPacket(inPkt);
@@ -178,37 +201,60 @@ public class PacketHandler implements IListenDataPacket {
             Ethernet ethFrame = (Ethernet) pkt;
             byte[] srcMAC_B = (ethFrame).getSourceMACAddress();
             long srcMAC = BitBufferHelper.toNumber(srcMAC_B);
+            byte[] dstMAC_B = (ethFrame).getDestinationMACAddress();
+            long dstMAC = BitBufferHelper.toNumber(dstMAC_B);
             Object l3Pkt = ethFrame.getPayload();
 
             if (l3Pkt instanceof IPv4) {
                 IPv4 ipv4Pkt = (IPv4) l3Pkt;
-                InetAddress orgAddr = intToInetAddress(ipv4Pkt.getSourceAddress());
+                InetAddress srcAddr = intToInetAddress(ipv4Pkt.getSourceAddress());
                 InetAddress dstAddr = intToInetAddress(ipv4Pkt.getDestinationAddress());
                 Object l4Datagram = ipv4Pkt.getPayload();
 
-                learnSourceIP(orgAddr, ingressConnector);
+                //learnSourceIP(srcAddr, ingressConnector);
+                //Checking if the pair IP-MAC are in the list
+                Map<InetAddress, Long> srcIPMAC = new HashMap<InetAddress, Long>();
+                srcIPMAC.clear();
+                srcIPMAC.put(srcAddr,srcMAC);
+
+                if(knowHost(srcIPMAC)==null){
+                  learnSourceIPMAC(srcIPMAC, ingressConnector);
+                }
 
                 if (l4Datagram instanceof ICMP) {
                   ICMP icmpDatagram = (ICMP) l4Datagram;
+                  implementationRoute.init();
 
-                  NodeConnector egressConnector = getOutConnector(dstAddr);
+                  Map<InetAddress, Long> dstIPMAC = new HashMap<InetAddress, Long>();
+                  dstIPMAC.clear();
+                  dstIPMAC.put(dstAddr,dstMAC);
+                  //Checking ir we haven't got the connector yet
+                  NodeConnector egressConnector = knowHost(dstIPMAC);
+                  //NodeConnector egressConnector = getOutConnector(dstAddr);
                   if(egressConnector==null){
-
+                    //In case don't have the connector, we flood the packet
                     floodPacket(inPkt);
 
                   } else{
 
                     /**************************Pruebas Dijkstra*********************/
 
-                    Path result = implementationRoute.getRoute(ingressConnector.getNode(), egressConnector.getNode());
-                    if(result==null)
-                    log.trace("Obtenido el path gracias a Dijkstra: " + result);
-                    else
-                    log.trace("Lo que devuelve es nulo");
+                    Set<Node> nodos = switchManager.getNodes();
+
+                    for (Iterator<Node> it = nodos.iterator(); it.hasNext(); ) {
+                       Node temp = it.next();
+                       stats = statisticsManager.getNodeConnectorStatistics(temp);
+                       learnNodeStatistics(temp,stats);
+                       //log.trace("Nodo por el que nos llega: " + ingressConnector.getNode());
+                       //log.trace("Nodo a comparar: " + temp);
+                       //Path result = implementationRoute.getRoute(ingressConnector.getNode(), temp);
+                          // log.trace("Obtenido el path con routeFinder: " + result);
+
+                    }
 
                     /**************************************************************/
-                    
-                    if(  programFlow( orgAddr, dstAddr, egressConnector, node) ){
+
+                    if(programFlow( srcAddr, srcMAC_B, dstAddr, dstMAC_B, egressConnector, node) ){
                       log.trace("Flujo instalado correctamente en el nodo " + node + " por el puerto " + egressConnector);
                     }
                     else{
@@ -249,13 +295,23 @@ public class PacketHandler implements IListenDataPacket {
             }
         }
 
-    private boolean programFlow(InetAddress orgAddr, InetAddress dstAddr, NodeConnector outConnector, Node node) {
+    /**
+    Whit this function we can program a flow in a selected Node with different match and only one action, transmit
+    for a selected nodeconnector. We select a lot of parameters like src and dst IP and MAC, protocol (ICMP) and
+    timeOuts for the flow (idle and hard).
+
+    */
+
+    private boolean programFlow(InetAddress srcAddr, byte[] srcMAC_B, InetAddress dstAddr,
+    byte[] dstMAC_B, NodeConnector outConnector, Node node) {
 
         Match match = new Match();
         match.setField(MatchType.DL_TYPE, (short) 0x0800);  // IPv4 ethertype
         match.setField(MatchType.NW_PROTO, IPProtocols.ICMP.byteValue());
-        match.setField(MatchType.NW_SRC, orgAddr);
+        match.setField(MatchType.NW_SRC, srcAddr);
         match.setField(MatchType.NW_DST, dstAddr);
+        match.setField(MatchType.DL_SRC, srcMAC_B);
+        match.setField(MatchType.DL_DST, dstMAC_B);
 
         List<Action> actions = new ArrayList<Action>();
         actions.add(new Output(outConnector));
@@ -265,8 +321,8 @@ public class PacketHandler implements IListenDataPacket {
         // Create the flow
         Flow flow = new Flow(match, actions);
 
-        flow.setIdleTimeout(idle);
-        flow.setHardTimeout(hard);
+        flow.setIdleTimeout(idleTimeOut);
+        flow.setHardTimeout(hardTimeOut);
 
         // Use FlowProgrammerService to program flow.
         Status status = flowProgrammerService.addFlowAsync(node, flow);
@@ -280,15 +336,56 @@ public class PacketHandler implements IListenDataPacket {
 
     }
 
+    /**
+    Deprecated
+    Put in a List the relationship between IP and nodeconnector.
+    */
+
     private void learnSourceIP(InetAddress srcIP, NodeConnector ingressConnector) {
 
       this.listIP.put(srcIP, ingressConnector);
 
     }
 
-    private NodeConnector getOutConnector(InetAddress orgAddress) {
+    /**
+    Put in a ConcurrentMap the relation between IP-MAC and Nodeconnector.
+    */
 
-        return this.listIP.get(orgAddress);
+    private void learnSourceIPMAC(Map<InetAddress, Long> src, NodeConnector ingressConnector) {
+
+      this.listIPMAC.put(src, ingressConnector);
+
+    }
+
+    /**
+    Put in a list an update statistics for each node.
+    */
+
+    private void learnNodeStatistics(Node nodo, List<NodeConnectorStatistics> statistics){
+
+      this.nodeStatistics.remove(nodo);
+      this.nodeStatistics.put(nodo,statistics);
+
+    }
+
+    /**
+    Deprecated
+    return the nodeconnector from a selected IP
+    */
+
+    private NodeConnector getOutConnector(InetAddress srcAddress) {
+
+        return this.listIP.get(srcAddress);
+    }
+
+    /**
+    Return a Nodeconnector from a pair IP-MAC
+    */
+
+    private NodeConnector knowHost(Map<InetAddress, Long> host){
+
+        return this.listIPMAC.get(host);
+
     }
 
 }
