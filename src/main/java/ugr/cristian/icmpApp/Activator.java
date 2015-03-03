@@ -81,6 +81,11 @@ public class Activator extends ComponentActivatorAbstractBase {
                     "setStatisticsManagerService", "unsetStatisticsManagerService")
                     .setRequired(true));
 
+            //Need a TopologyManagerService to try to obtain map with the topology
+            c.add(createContainerServiceDependency(containerName).setService(
+                    ITopologyManager.class).setCallbacks(
+                    "setTopologyService", "unsetTopologyService")
+                    .setRequired(true));
         }
 
     }

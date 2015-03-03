@@ -74,10 +74,11 @@ public class PacketHandler implements IListenDataPacket {
     private static final Logger log = LoggerFactory.getLogger(PacketHandler.class);
 
     private IDataPacketService dataPacketService;
-    routeImp implementationRoute = new routeImp();
+    private routeImp implementationRoute = new routeImp();
     private ISwitchManager switchManager;
     private IFlowProgrammerService flowProgrammerService;
     private IStatisticsManager statisticsManager;
+    private ITopologyManager topologyManager;
     private Map <InetAddress, NodeConnector> listIP = new HashMap <InetAddress, NodeConnector>();
     private ConcurrentMap< Map<InetAddress, Long>, NodeConnector> listIPMAC = new ConcurrentHashMap<Map<InetAddress, Long>, NodeConnector>();
     private Map<Node, List<NodeConnectorStatistics>> nodeStatistics = new HashMap<Node, List<NodeConnectorStatistics>>();
@@ -172,13 +173,33 @@ public class PacketHandler implements IListenDataPacket {
     }
 
     /**
-     * Unsets FlowProgrammerService
+     * Unset StatisticsManager
      */
     void unsetFStatisticsManagerService(IStatisticsManager s) {
         log.trace("Unset StatisticsManagerService.");
 
         if (  statisticsManager == s) {
             statisticsManager = null;
+        }
+    }
+
+    /**
+     * Sets a reference to the requested TopologyManager
+     */
+    void setStatisticsManagerService(ITopologyManager s) {
+        log.trace("Set TopologyManagerService.");
+
+        topologyManager = s;
+    }
+
+    /**
+     * Unset TopologyManager
+     */
+    void unsetFStatisticsManagerService(ITopologyManager s) {
+        log.trace("Unset TopologyManagerService.");
+
+        if (  topologyManager == s) {
+            topologyManager = null;
         }
     }
 
@@ -189,6 +210,10 @@ public class PacketHandler implements IListenDataPacket {
         NodeConnector ingressConnector = inPkt.getIncomingNodeConnector();
         // The node that received the packet ("switch")
         Node node = ingressConnector.getNode();
+
+        //////////////////////////////////////
+        showTopology(topologyManager);
+        /////////////////////////////////////
 
         //List of nodeconnector statistics;
         List<NodeConnectorStatistics> stats;
@@ -385,6 +410,15 @@ public class PacketHandler implements IListenDataPacket {
     private NodeConnector knowHost(Map<InetAddress, Long> host){
 
         return this.listIPMAC.get(host);
+
+    }
+
+    /**
+    Show differents options about the current topology
+    */
+
+    private void showTopology(ITopologyManager topologyManager){
+
 
     }
 
