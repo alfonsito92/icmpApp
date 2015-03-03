@@ -84,7 +84,7 @@ public class Activator extends ComponentActivatorAbstractBase {
             //Need a TopologyManagerService to try to obtain map with the topology
             c.add(createContainerServiceDependency(containerName).setService(
                     ITopologyManager.class).setCallbacks(
-                    "setTopologyService", "unsetTopologyService")
+                    "setTopologyManagerService", "unsetTopologyManagerService")
                     .setRequired(true));
         }
 

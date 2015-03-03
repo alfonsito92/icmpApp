@@ -175,7 +175,7 @@ public class PacketHandler implements IListenDataPacket {
     /**
      * Unset StatisticsManager
      */
-    void unsetFStatisticsManagerService(IStatisticsManager s) {
+    void unsetStatisticsManagerService(IStatisticsManager s) {
         log.trace("Unset StatisticsManagerService.");
 
         if (  statisticsManager == s) {
@@ -186,7 +186,7 @@ public class PacketHandler implements IListenDataPacket {
     /**
      * Sets a reference to the requested TopologyManager
      */
-    void setStatisticsManagerService(ITopologyManager s) {
+    void setTopologyManagerService(ITopologyManager s) {
         log.trace("Set TopologyManagerService.");
 
         topologyManager = s;
@@ -195,7 +195,7 @@ public class PacketHandler implements IListenDataPacket {
     /**
      * Unset TopologyManager
      */
-    void unsetFStatisticsManagerService(ITopologyManager s) {
+    void unsetTopologyManagerService(ITopologyManager s) {
         log.trace("Unset TopologyManagerService.");
 
         if (  topologyManager == s) {
@@ -210,10 +210,6 @@ public class PacketHandler implements IListenDataPacket {
         NodeConnector ingressConnector = inPkt.getIncomingNodeConnector();
         // The node that received the packet ("switch")
         Node node = ingressConnector.getNode();
-
-        //////////////////////////////////////
-        showTopology();
-        /////////////////////////////////////
 
         //List of nodeconnector statistics;
         List<NodeConnectorStatistics> stats;
@@ -270,11 +266,6 @@ public class PacketHandler implements IListenDataPacket {
                        Node temp = it.next();
                        stats = statisticsManager.getNodeConnectorStatistics(temp);
                        learnNodeStatistics(temp,stats);
-                       //log.trace("Nodo por el que nos llega: " + ingressConnector.getNode());
-                       //log.trace("Nodo a comparar: " + temp);
-                       //Path result = implementationRoute.getRoute(ingressConnector.getNode(), temp);
-                          // log.trace("Obtenido el path con routeFinder: " + result);
-
                     }
 
                     /**************************************************************/
@@ -285,7 +276,9 @@ public class PacketHandler implements IListenDataPacket {
                     else{
                       log.trace("Error instalando el flujo");
                     }
-
+                    //////////////////////////////////////
+                    showTopology(topologyManager);//YEEEEEEEEEEEEEEEEEEEEEEAAAAAAAAAAAAAAAAH
+                    /////////////////////////////////////
                     inPkt.setOutgoingNodeConnector(egressConnector);
                     this.dataPacketService.transmitDataPacket(inPkt);
 
@@ -390,6 +383,7 @@ public class PacketHandler implements IListenDataPacket {
 
       this.nodeStatistics.remove(nodo);
       this.nodeStatistics.put(nodo,statistics);
+      this.log.trace("Las estadísticas del nodo: " + nodo + "son " +statistics);
 
     }
 
@@ -417,10 +411,24 @@ public class PacketHandler implements IListenDataPacket {
     Show differents options about the current topology
     */
 
-    private void showTopology(){
+    private void showTopology(ITopologyManager topologyManager){
 
-      Map<Edge, Set<Property>> edges = this.topologyManager.getEdges();
+      Map<Edge, Set<Property>> edges = topologyManager.getEdges();
+      log.trace("El mapa de Edges es: " + edges);
 
+    }
+
+    /**
+    Method whic travel throug set<Object>
+    */
+
+    private void walkSet(Set<Object> object){
+
+      for (Iterator<Object> it = object.iterator(); it.hasNext(); ) {
+         Object temp = it.next();
+         this.log.trace("El objeto correspondiente a la posicion: " + it + "es " + temp);
+
+      }
 
     }
 
