@@ -212,7 +212,7 @@ public class PacketHandler implements IListenDataPacket {
         Node node = ingressConnector.getNode();
 
         //////////////////////////////////////
-        showTopology(topologyManager);
+        showTopology();
         /////////////////////////////////////
 
         //List of nodeconnector statistics;
@@ -417,7 +417,9 @@ public class PacketHandler implements IListenDataPacket {
     Show differents options about the current topology
     */
 
-    private void showTopology(ITopologyManager topologyManager){
+    private void showTopology(){
+
+      Map<Edge, Set<Property>> edges = this.topologyManager.getEdges();
 
 
     }
