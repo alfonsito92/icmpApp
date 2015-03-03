@@ -52,11 +52,6 @@
         <artifactId>statisticsmanager</artifactId>
         <version>0.5.1-SNAPSHOT</version>
       </dependency>
-      <dependency>
-        <groupId>ugr.cristian</groupId>
-        <artifactId>routeFinder</artifactId>
-        <version>0.1</version>
-      </dependency>
     </dependencies>
     <repositories>
       <!-- OpenDaylight releases -->

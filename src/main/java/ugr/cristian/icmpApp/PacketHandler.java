@@ -64,8 +64,6 @@ import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 
-import ugr.cristian.routeFinder.routeImp;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +72,6 @@ public class PacketHandler implements IListenDataPacket {
     private static final Logger log = LoggerFactory.getLogger(PacketHandler.class);
 
     private IDataPacketService dataPacketService;
-    private routeImp implementationRoute = new routeImp();
     private ISwitchManager switchManager;
     private IFlowProgrammerService flowProgrammerService;
     private IStatisticsManager statisticsManager;
@@ -244,8 +241,6 @@ public class PacketHandler implements IListenDataPacket {
 
                 if (l4Datagram instanceof ICMP) {
                   ICMP icmpDatagram = (ICMP) l4Datagram;
-                  implementationRoute.init();
-
                   Map<InetAddress, Long> dstIPMAC = new HashMap<InetAddress, Long>();
                   dstIPMAC.clear();
                   dstIPMAC.put(dstAddr,dstMAC);

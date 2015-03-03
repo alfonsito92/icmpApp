@@ -30,8 +30,6 @@ import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 
-import ugr.cristian.routeFinder.routeImp;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

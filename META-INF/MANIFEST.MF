@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Bnd-LastModified: 1425386123107
+Bnd-LastModified: 1425410548290
 Build-Jdk: 1.7.0_75
 Built-By: cristian
 Bundle-Activator: ugr.cristian.icmpApp.Activator
@@ -12,10 +12,10 @@ Export-Package: ugr.cristian.icmpApp;uses:="org.opendaylight.controller.
  sal.flowprogrammer,org.opendaylight.controller.sal.core,org.opendayligh
  t.controller.statisticsmanager,org.opendaylight.controller.topologymana
  ger,org.apache.felix.dm,org.opendaylight.controller.switchmanager,org.o
- pendaylight.controller.sal.packet,org.slf4j,ugr.cristian.routeFinder,or
- g.opendaylight.controller.sal.reader,org.opendaylight.controller.sal.ut
- ils,org.opendaylight.controller.sal.action,org.opendaylight.controller.
- sal.match";version="0.2.0"
+ pendaylight.controller.sal.packet,org.slf4j,org.opendaylight.controller
+ .sal.reader,org.opendaylight.controller.sal.utils,org.opendaylight.cont
+ roller.sal.action,org.opendaylight.controller.sal.match";version="0.2.0
+ "
 Import-Package: org.apache.felix.dm;version="[3.0,4)",org.opendaylight.c
  ontroller.sal.action;version="[0.7,1)",org.opendaylight.controller.sal.
  core;version="[0.7,1)",org.opendaylight.controller.sal.flowprogrammer;v
@@ -25,6 +25,5 @@ Import-Package: org.apache.felix.dm;version="[3.0,4)",org.opendaylight.c
  r.sal.utils;version="[0.7,1)",org.opendaylight.controller.statisticsman
  ager;version="[0.5,1)",org.opendaylight.controller.switchmanager;versio
  n="[0.7,1)",org.opendaylight.controller.topologymanager;version="[0.4,1
- )",org.slf4j;version="[1.7,2)",ugr.cristian.routeFinder;version="[0.1,1
- )"
+ )",org.slf4j;version="[1.7,2)"
 Tool: Bnd-1.50.0
