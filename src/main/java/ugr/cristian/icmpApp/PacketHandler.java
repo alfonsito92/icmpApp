@@ -39,6 +39,7 @@ import org.opendaylight.controller.sal.action.SetNwSrc;
 import org.opendaylight.controller.sal.core.ConstructionException;
 import org.opendaylight.controller.sal.core.Node;
 import org.opendaylight.controller.sal.core.Edge;
+import org.opendaylight.controller.sal.core.Host;
 import org.opendaylight.controller.sal.core.Path;
 import org.opendaylight.controller.sal.core.Property;
 import org.opendaylight.controller.sal.core.NodeConnector;
@@ -78,9 +79,9 @@ public class PacketHandler implements IListenDataPacket {
     private ITopologyManager topologyManager;
     private Map <InetAddress, NodeConnector> listIP = new HashMap <InetAddress, NodeConnector>();
     private ConcurrentMap< Map<InetAddress, Long>, NodeConnector> listIPMAC = new ConcurrentHashMap<Map<InetAddress, Long>, NodeConnector>();
-    private Map<Node, List<NodeConnectorStatistics>> nodeStatistics = new HashMap<Node, List<NodeConnectorStatistics>>();
-
-
+    private Map<Node, Set<Edge>> nodeEdgeTopology = new HashMap<Node, Set<Edge>>();
+    private Map<Edge, Set<Property>> edgeProperties = new HashMap<Edge, Set<Property>>();
+    private List<Host> hosts = new ArrayList<Host>();
 
     private short idleTimeOut = 30;
     private short hardTimeOut = 60;
@@ -207,10 +208,6 @@ public class PacketHandler implements IListenDataPacket {
         NodeConnector ingressConnector = inPkt.getIncomingNodeConnector();
         // The node that received the packet ("switch")
         Node node = ingressConnector.getNode();
-
-        //List of nodeconnector statistics;
-        List<NodeConnectorStatistics> stats;
-
         // Use DataPacketService to decode the packet.
         Packet pkt = dataPacketService.decodeDataPacket(inPkt);
 
@@ -240,40 +237,40 @@ public class PacketHandler implements IListenDataPacket {
                 }
 
                 if (l4Datagram instanceof ICMP) {
+
                   ICMP icmpDatagram = (ICMP) l4Datagram;
                   Map<InetAddress, Long> dstIPMAC = new HashMap<InetAddress, Long>();
                   dstIPMAC.clear();
                   dstIPMAC.put(dstAddr,dstMAC);
                   //Checking ir we haven't got the connector yet
                   NodeConnector egressConnector = knowHost(dstIPMAC);
-                  //NodeConnector egressConnector = getOutConnector(dstAddr);
+
                   if(egressConnector==null){
                     //In case don't have the connector, we flood the packet
                     floodPacket(inPkt);
 
                   } else{
 
-                    /**************************Pruebas Dijkstra*********************/
+                    /*************************Calculo ruta**************************/
 
-                    Set<Node> nodos = switchManager.getNodes();
+                    nodeEdgeTopology.clear();
+                    edgeProperties.clear();
 
-                    for (Iterator<Node> it = nodos.iterator(); it.hasNext(); ) {
-                       Node temp = it.next();
-                       stats = statisticsManager.getNodeConnectorStatistics(temp);
-                       learnNodeStatistics(temp,stats);
-                    }
+                    nodeEdgeTopology = topologyManager.getNodeEdges();
+                    edgeProperties = topologyManager.getEdges();
 
-                    /**************************************************************/
-
+                    /***************************************************************/
                     if(programFlow( srcAddr, srcMAC_B, dstAddr, dstMAC_B, egressConnector, node) ){
-                      log.trace("Flujo instalado correctamente en el nodo " + node + " por el puerto " + egressConnector);
+
+                      log.debug("Flujo instalado correctamente en el nodo " + node + " por el puerto " + egressConnector);
+
                     }
                     else{
-                      log.trace("Error instalando el flujo");
+                      log.debug("Error instalando el flujo");
                     }
-                    //////////////////////////////////////
-                    showTopology(topologyManager);//YEEEEEEEEEEEEEEEEEEEEEEAAAAAAAAAAAAAAAAH
-                    /////////////////////////////////////
+
+                    log.debug("NodeConnectors con Host conectados: " + topologyManager.getNodeConnectorWithHost());
+
                     inPkt.setOutgoingNodeConnector(egressConnector);
                     this.dataPacketService.transmitDataPacket(inPkt);
 
@@ -371,18 +368,6 @@ public class PacketHandler implements IListenDataPacket {
     }
 
     /**
-    Put in a list an update statistics for each node.
-    */
-
-    private void learnNodeStatistics(Node nodo, List<NodeConnectorStatistics> statistics){
-
-      this.nodeStatistics.remove(nodo);
-      this.nodeStatistics.put(nodo,statistics);
-      this.log.trace("Las estadísticas del nodo: " + nodo + "son " +statistics);
-
-    }
-
-    /**
     Deprecated
     return the nodeconnector from a selected IP
     */
@@ -406,10 +391,10 @@ public class PacketHandler implements IListenDataPacket {
     Show differents options about the current topology
     */
 
-    private void showTopology(ITopologyManager topologyManager){
+    private void showTopology(){
 
-      Map<Edge, Set<Property>> edges = topologyManager.getEdges();
-      log.trace("El mapa de Edges es: " + edges);
+      Map<Edge, Set<Property>> edges = this.topologyManager.getEdges();
+      log.debug("El mapa de Edges es: " + edges);
 
     }
 
@@ -421,10 +406,11 @@ public class PacketHandler implements IListenDataPacket {
 
       for (Iterator<Object> it = object.iterator(); it.hasNext(); ) {
          Object temp = it.next();
-         this.log.trace("El objeto correspondiente a la posicion: " + it + "es " + temp);
+         this.log.debug("El objeto correspondiente a la posicion: " + it + "es " + temp);
 
       }
 
     }
+
 
 }
